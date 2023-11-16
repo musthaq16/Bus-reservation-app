@@ -17,3 +17,9 @@ func UserRoutes(incomingRoutes *gin.Engine) {
 	incomingRoutes.PATCH("/edituser", controller.UpdateUserDetailsHandler)
 	// incomingRoutes.GET("helloall", controller.Hello)
 }
+
+// UserRoutes function
+func AdminRoutes(incomingRoutes *gin.Engine) {
+	incomingRoutes.POST("/admin/adduser", controller.Adduser)
+	// incomingRoutes.GET("helloall", controller.Hello)
+}

@@ -18,35 +18,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var userCollection *mongo.Collection = configs.GetCollection(configs.DB, "user")
 var validate = validator.New()
-
-// HashPassword is used to encrypt the password before it is stored in the DB
-func HashPassword(password string) string {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return string(bytes)
-}
-
-// VerifyPassword checks the input password while verifying it with the passward in the DB.
-func VerifyPassword(userPassword string, providedPassword string) (bool, string) {
-	err := bcrypt.CompareHashAndPassword([]byte(providedPassword), []byte(userPassword))
-	check := true
-	msg := ""
-
-	if err != nil {
-		msg = fmt.Sprintf("login or passowrd is incorrect")
-		check = false
-	}
-
-	return check, msg
-}
 
 // CreateUser is the api used to tget a single user
 func SignUp() gin.HandlerFunc {
@@ -77,7 +52,7 @@ func SignUp() gin.HandlerFunc {
 			return
 		}
 
-		password := HashPassword(*user.Password)
+		password := helper.HashPassword(*user.Password)
 		user.Password = &password
 
 		count, err = userCollection.CountDocuments(ctx, bson.M{"phone": user.Phone})
@@ -149,7 +124,7 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
-		passwordIsValid, msg := VerifyPassword(*user.Password, *foundUser.Password)
+		passwordIsValid, msg := helper.VerifyPassword(*user.Password, *foundUser.Password)
 		defer cancel()
 		if !passwordIsValid {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
@@ -189,7 +164,7 @@ func UpdateUserDetailsHandler(c *gin.Context) {
 	defer cancel()
 
 	// Call the UpdateUserDetailsByEmail function
-	err := UpdateUserDetailsByUid(
+	err := helper.UpdateUserDetailsByUid(
 		ctx,
 		*updateUserDetailsRequest.Email,
 		*updateUserDetailsRequest.Username,
@@ -205,102 +180,97 @@ func UpdateUserDetailsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User details updated successfully"})
 }
 
-// UpdateUserDetailsByUid updates user details in the database
-func UpdateUserDetailsByUid(ctx context.Context, email, username, phoneNumber, password string, user_id interface{}) error {
-	// Check if the new username already exists
-	existingUser, err := GetUserByUsername(ctx, username)
-	if err != nil && err != mongo.ErrNoDocuments {
-		return err
-	}
-	if existingUser != nil && existingUser.User_id != user_id {
-		return fmt.Errorf("Username %s already exists", username)
+func Adduser(c *gin.Context) {
+	// Extract admin information from the token or any other identifier
+	roleFromToken, exists := c.Get("role")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Role information not found"})
+		return
 	}
 
-	// Check if the new email already exists
-	existingUser, err = GetUserByEmail(ctx, email)
-	if err != nil && err != mongo.ErrNoDocuments {
-		return err
-	}
-	if existingUser != nil && existingUser.User_id != user_id {
-		return fmt.Errorf("Email %s already exists", email)
+	// Check if the user making the request is an admin
+	isAdmin, _ := roleFromToken.(string)
+	if isAdmin != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized access"})
+		return
 	}
 
-	// Check if the new phone number already exists
-	existingUser, err = GetUserByPhoneNumber(ctx, phoneNumber)
-	if err != nil && err != mongo.ErrNoDocuments {
-		return err
-	}
-	if existingUser != nil && existingUser.User_id != user_id {
-		return fmt.Errorf("Phone number %s already exists", phoneNumber)
+	// Extract user information from the request
+	var addUserRequest models.User
+	if err := c.BindJSON(&addUserRequest); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
 	}
 
-	// Hash the new password before updating it in the database
-	hashedPassword := HashPassword(password)
-
-	// Define the update query to set the new hashed password, new email, new username, and new phone number
-	update := bson.M{
-		"$set": bson.M{
-			"username": username,
-			"email":    email,
-			"phone":    phoneNumber,
-			"password": hashedPassword,
-		},
+	// Check if the required fields are present
+	if addUserRequest.Email == nil || addUserRequest.Password == nil || addUserRequest.Phone == nil || addUserRequest.Username == nil || addUserRequest.Role == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email,Password,phoneNumber,username and role are required"})
+		return
 	}
 
-	// Execute the update query using the provided context
-	result, err := userCollection.UpdateOne(ctx, bson.M{"user_id": user_id}, update)
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Check if the email already exists
+	existingUserMail, err := helper.GetUserByEmail(ctx, *addUserRequest.Email)
 	if err != nil {
-		return err
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error checking user Mail existence: %v", err)})
+		return
+	}
+	if existingUserMail != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "User with the provided email already exists"})
+		return
+	}
+	existingUserName, err := helper.GetUserByUsername(ctx, *addUserRequest.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error checking user Name existence: %v", err)})
+		return
+	}
+	if existingUserName != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "User with the provided email already exists"})
+		return
+	}
+	existingUserPhone, err := helper.GetUserByPhoneNumber(ctx, *addUserRequest.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error checking user Phonenumber existence: %v", err)})
+		return
+	}
+	if existingUserPhone != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "User with the provided Phonenumber already exists"})
+		return
+	}
+	createdAt, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+	updatedAt, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+
+	// Hash the password before storing it in the database
+	hashedPassword := helper.HashPassword(*addUserRequest.Password)
+
+	// Create a new user object
+	newUser := models.User{
+		ID:         primitive.NewObjectID(),
+		Email:      addUserRequest.Email,
+		Password:   &hashedPassword,
+		Username:   addUserRequest.Username,
+		User_id:    primitive.NewObjectID().Hex(), // Generate a new UserID
+		Phone:      addUserRequest.Phone,
+		Role:       addUserRequest.Role,
+		Created_at: createdAt,
+		Updated_at: updatedAt,
+		// Add other fields as needed
 	}
 
-	// Check if any documents were modified
-	if result.ModifiedCount == 0 {
-		// If no documents were modified, it means there is no user with the provided user_id
-		return fmt.Errorf("No user found with the user_id: %s", user_id)
+	// Insert the new user into the database
+	_, err = userCollection.InsertOne(ctx, newUser)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to add user: %v", err)})
+		return
 	}
 
-	return nil
+	c.JSON(http.StatusOK, gin.H{"message": "User added successfully"})
+
 }
 
 func Hello(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
-}
-
-// GetUserByUsername retrieves a user by username
-func GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
-	var user models.User
-	err := userCollection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
-	if err == mongo.ErrNoDocuments {
-		return nil, nil // User not found
-	}
-	if err != nil {
-		return nil, err // Other errors
-	}
-	return &user, nil
-}
-
-// GetUserByEmail retrieves a user by email
-func GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
-	var user models.User
-	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
-	if err == mongo.ErrNoDocuments {
-		return nil, nil // User not found
-	}
-	if err != nil {
-		return nil, err // Other errors
-	}
-	return &user, nil
-}
-
-// GetUserByPhoneNumber retrieves a user by phone number
-func GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*models.User, error) {
-	var user models.User
-	err := userCollection.FindOne(ctx, bson.M{"phone": phoneNumber}).Decode(&user)
-	if err == mongo.ErrNoDocuments {
-		return nil, nil // User not found
-	}
-	if err != nil {
-		return nil, err // Other errors
-	}
-	return &user, nil
 }

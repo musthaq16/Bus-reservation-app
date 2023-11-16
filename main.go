@@ -24,6 +24,7 @@ func main() {
 	routes.UserRouter(r)
 	r.Use(middleware.Authentication())
 	routes.UserRoutes(r)
+	routes.AdminRoutes(r)
 
 	// r.POST("/login", controllers.Login())
 
