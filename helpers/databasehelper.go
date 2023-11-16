@@ -49,11 +49,7 @@ func GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*models.User
 }
 
 // UpdateUserDetailsByUid updates user details in the database
-func UpdateUserDetailsByUid(
-	ctx context.Context,
-	email, username, phoneNumber, password string,
-	user_id interface{},
-) error {
+func UpdateUserDetailsByUid(ctx context.Context, updateUserDetailsRequest models.User, user_id interface{}) error {
 	// Fetch the existing user details
 	existingUser, err := GetUserByUid(ctx, user_id)
 	if err != nil {
@@ -61,55 +57,55 @@ func UpdateUserDetailsByUid(
 	}
 
 	// Set parameters to existing values if they are missing in the request
-	if email == "" {
-		email = *existingUser.Email
+	if updateUserDetailsRequest.Email == nil {
+		updateUserDetailsRequest.Email = existingUser.Email
 	}
-	if username == "" {
-		username = *existingUser.Username
+	if updateUserDetailsRequest.Username == nil {
+		updateUserDetailsRequest.Username = existingUser.Username
 	}
-	if phoneNumber == "" {
-		phoneNumber = *existingUser.Phone
+	if updateUserDetailsRequest.Phone == nil {
+		updateUserDetailsRequest.Phone = existingUser.Phone
 	}
-	if password == "" {
-		password = *existingUser.Password
+	if updateUserDetailsRequest.Password == nil {
+		updateUserDetailsRequest.Password = existingUser.Password
 	}
 
 	// Check if the new username already exists
-	existingUserByUsername, err := GetUserByUsername(ctx, username)
+	existingUserByUsername, err := GetUserByUsername(ctx, *updateUserDetailsRequest.Username)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
 	if existingUserByUsername != nil && existingUserByUsername.User_id != user_id {
-		return fmt.Errorf("Username %s already exists", username)
+		return fmt.Errorf("Username %s already exists", *updateUserDetailsRequest.Username)
 	}
 
 	// Check if the new email already exists
-	existingUserByEmail, err := GetUserByEmail(ctx, email)
+	existingUserByEmail, err := GetUserByEmail(ctx, *updateUserDetailsRequest.Email)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
 	if existingUserByEmail != nil && existingUserByEmail.User_id != user_id {
-		return fmt.Errorf("Email %s already exists", email)
+		return fmt.Errorf("Email %s already exists", *updateUserDetailsRequest.Email)
 	}
 
 	// Check if the new phone number already exists
-	existingUserByPhone, err := GetUserByPhoneNumber(ctx, phoneNumber)
+	existingUserByPhone, err := GetUserByPhoneNumber(ctx, *updateUserDetailsRequest.Phone)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
 	if existingUserByPhone != nil && existingUserByPhone.User_id != user_id {
-		return fmt.Errorf("Phone number %s already exists", phoneNumber)
+		return fmt.Errorf("Phone number %s already exists", *updateUserDetailsRequest.Phone)
 	}
 
 	// Hash the new password before updating it in the database
-	hashedPassword := HashPassword(password)
+	hashedPassword := HashPassword(*updateUserDetailsRequest.Password)
 
 	// Define the update query to set the new hashed password, new email, new username, and new phone number
 	update := bson.M{
 		"$set": bson.M{
-			"username": username,
-			"email":    email,
-			"phone":    phoneNumber,
+			"username": *updateUserDetailsRequest.Username,
+			"email":    *updateUserDetailsRequest.Email,
+			"phone":    *updateUserDetailsRequest.Phone,
 			"password": hashedPassword,
 		},
 	}
@@ -129,6 +125,84 @@ func UpdateUserDetailsByUid(
 	return nil
 }
 
+// // UpdateUserDetailsByUid updates user details in the database
+// func UpdateUserDetailsByUid(ctx context.Context, email, username, phoneNumber, password string, user_id interface{}) error {
+// 	// Fetch the existing user details
+// 	existingUser, err := GetUserByUid(ctx, user_id)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	// Set parameters to existing values if they are missing in the request
+// 	if email == "" {
+// 		email = *existingUser.Email
+// 	}
+// 	if username == "" {
+// 		username = *existingUser.Username
+// 	}
+// 	if phoneNumber == "" {
+// 		phoneNumber = *existingUser.Phone
+// 	}
+// 	if password == "" {
+// 		password = *existingUser.Password
+// 	}
+
+// 	// Check if the new username already exists
+// 	existingUserByUsername, err := GetUserByUsername(ctx, username)
+// 	if err != nil && err != mongo.ErrNoDocuments {
+// 		return err
+// 	}
+// 	if existingUserByUsername != nil && existingUserByUsername.User_id != user_id {
+// 		return fmt.Errorf("Username %s already exists", username)
+// 	}
+
+// 	// Check if the new email already exists
+// 	existingUserByEmail, err := GetUserByEmail(ctx, email)
+// 	if err != nil && err != mongo.ErrNoDocuments {
+// 		return err
+// 	}
+// 	if existingUserByEmail != nil && existingUserByEmail.User_id != user_id {
+// 		return fmt.Errorf("Email %s already exists", email)
+// 	}
+
+// 	// Check if the new phone number already exists
+// 	existingUserByPhone, err := GetUserByPhoneNumber(ctx, phoneNumber)
+// 	if err != nil && err != mongo.ErrNoDocuments {
+// 		return err
+// 	}
+// 	if existingUserByPhone != nil && existingUserByPhone.User_id != user_id {
+// 		return fmt.Errorf("Phone number %s already exists", phoneNumber)
+// 	}
+
+// 	// Hash the new password before updating it in the database
+// 	hashedPassword := HashPassword(password)
+
+// 	// Define the update query to set the new hashed password, new email, new username, and new phone number
+// 	update := bson.M{
+// 		"$set": bson.M{
+// 			"username": username,
+// 			"email":    email,
+// 			"phone":    phoneNumber,
+// 			"password": hashedPassword,
+// 		},
+// 	}
+
+// 	// Execute the update query using the provided context
+// 	result, err := userCollection.UpdateOne(ctx, bson.M{"user_id": user_id}, update)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	// Check if any documents were modified
+// 	if result.ModifiedCount == 0 {
+// 		// If no documents were modified, it means there is no user with the provided user_id
+// 		return fmt.Errorf("No user found with the user_id: %s", user_id)
+// 	}
+
+// 	return nil
+// }
+
+// GetUserByUid retrieves a user based on the user_id
 func GetUserByUid(ctx context.Context, user_id interface{}) (*models.User, error) {
 	var user models.User
 

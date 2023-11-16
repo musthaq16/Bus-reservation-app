@@ -163,14 +163,11 @@ func UpdateUserDetailsHandler(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Call the UpdateUserDetailsByEmail function
+	// Call the UpdateUserDetailsByUid function
 	err := helper.UpdateUserDetailsByUid(
 		ctx,
-		*updateUserDetailsRequest.Email,
-		*updateUserDetailsRequest.Username,
-		*updateUserDetailsRequest.Phone,
-		*updateUserDetailsRequest.Password,
-		userIdFromToken,
+		updateUserDetailsRequest,
+		updateUserDetailsRequest.User_id,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update user details: %v", err)})
