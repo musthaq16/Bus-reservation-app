@@ -1,12 +1,15 @@
 package helpers
 
 import (
+	configs "busapp/database"
 	models "busapp/models"
 	"context"
 	"fmt"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // GetUserByUsername retrieves a user by username
@@ -100,13 +103,16 @@ func UpdateUserDetailsByUid(ctx context.Context, updateUserDetailsRequest models
 	// Hash the new password before updating it in the database
 	hashedPassword := HashPassword(*updateUserDetailsRequest.Password)
 
+	updated_at, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+
 	// Define the update query to set the new hashed password, new email, new username, and new phone number
 	update := bson.M{
 		"$set": bson.M{
-			"username": *updateUserDetailsRequest.Username,
-			"email":    *updateUserDetailsRequest.Email,
-			"phone":    *updateUserDetailsRequest.Phone,
-			"password": hashedPassword,
+			"username":   *updateUserDetailsRequest.Username,
+			"email":      *updateUserDetailsRequest.Email,
+			"phone":      *updateUserDetailsRequest.Phone,
+			"password":   hashedPassword,
+			"updated_at": updated_at,
 		},
 	}
 
@@ -125,82 +131,11 @@ func UpdateUserDetailsByUid(ctx context.Context, updateUserDetailsRequest models
 	return nil
 }
 
-// // UpdateUserDetailsByUid updates user details in the database
-// func UpdateUserDetailsByUid(ctx context.Context, email, username, phoneNumber, password string, user_id interface{}) error {
-// 	// Fetch the existing user details
-// 	existingUser, err := GetUserByUid(ctx, user_id)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// Set parameters to existing values if they are missing in the request
-// 	if email == "" {
-// 		email = *existingUser.Email
-// 	}
-// 	if username == "" {
-// 		username = *existingUser.Username
-// 	}
-// 	if phoneNumber == "" {
-// 		phoneNumber = *existingUser.Phone
-// 	}
-// 	if password == "" {
-// 		password = *existingUser.Password
-// 	}
-
-// 	// Check if the new username already exists
-// 	existingUserByUsername, err := GetUserByUsername(ctx, username)
-// 	if err != nil && err != mongo.ErrNoDocuments {
-// 		return err
-// 	}
-// 	if existingUserByUsername != nil && existingUserByUsername.User_id != user_id {
-// 		return fmt.Errorf("Username %s already exists", username)
-// 	}
-
-// 	// Check if the new email already exists
-// 	existingUserByEmail, err := GetUserByEmail(ctx, email)
-// 	if err != nil && err != mongo.ErrNoDocuments {
-// 		return err
-// 	}
-// 	if existingUserByEmail != nil && existingUserByEmail.User_id != user_id {
-// 		return fmt.Errorf("Email %s already exists", email)
-// 	}
-
-// 	// Check if the new phone number already exists
-// 	existingUserByPhone, err := GetUserByPhoneNumber(ctx, phoneNumber)
-// 	if err != nil && err != mongo.ErrNoDocuments {
-// 		return err
-// 	}
-// 	if existingUserByPhone != nil && existingUserByPhone.User_id != user_id {
-// 		return fmt.Errorf("Phone number %s already exists", phoneNumber)
-// 	}
-
-// 	// Hash the new password before updating it in the database
-// 	hashedPassword := HashPassword(password)
-
-// 	// Define the update query to set the new hashed password, new email, new username, and new phone number
-// 	update := bson.M{
-// 		"$set": bson.M{
-// 			"username": username,
-// 			"email":    email,
-// 			"phone":    phoneNumber,
-// 			"password": hashedPassword,
-// 		},
-// 	}
-
-// 	// Execute the update query using the provided context
-// 	result, err := userCollection.UpdateOne(ctx, bson.M{"user_id": user_id}, update)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// Check if any documents were modified
-// 	if result.ModifiedCount == 0 {
-// 		// If no documents were modified, it means there is no user with the provided user_id
-// 		return fmt.Errorf("No user found with the user_id: %s", user_id)
-// 	}
-
-// 	return nil
-// }
+// DeleteUserByUid deletes a user by user_id
+func DeleteUserByUid(ctx context.Context, user_id interface{}) error {
+	_, err := userCollection.DeleteOne(ctx, bson.M{"user_id": user_id})
+	return err
+}
 
 // GetUserByUid retrieves a user based on the user_id
 func GetUserByUid(ctx context.Context, user_id interface{}) (*models.User, error) {
@@ -216,4 +151,50 @@ func GetUserByUid(ctx context.Context, user_id interface{}) (*models.User, error
 	}
 
 	return &user, nil
+}
+
+// UpdateUserPasswordByEmail updates the user's password in the database
+func UpdateUserPasswordByEmail(ctx context.Context, email string, newPassword string) error {
+	// Your MongoDB collection for users
+	userCollection := configs.GetCollection(configs.DB, "user")
+
+	// Define the filter to find the user by email
+	filter := bson.M{"email": email}
+
+	// Define the update to set the new password and update the timestamp
+	update := bson.M{
+		"$set": bson.M{
+			"password":    HashPassword(newPassword),
+			"updated_at":  time.Now(),
+			"reset_token": nil, // Optionally, clear the reset token after successful password reset
+		},
+	}
+
+	// Set up options for the update
+	options := options.Update().SetUpsert(false)
+
+	// Perform the update operation
+	result, err := userCollection.UpdateOne(ctx, filter, update, options)
+	if err != nil {
+		return fmt.Errorf("Failed to update user password: %v", err)
+	}
+
+	// Check if any documents were modified
+	if result.ModifiedCount == 0 {
+		// If no documents were modified, it means there is no user with the provided email
+		return fmt.Errorf("No user found with the email: %s", email)
+	}
+
+	return nil
+}
+
+// GetUserByResetToken retrieves a user by their reset token from the database
+func GetUserByResetToken(ctx context.Context, resetToken string) (models.User, error) {
+	var user models.User
+	filter := bson.D{{"reset_token", resetToken}}
+	err := userCollection.FindOne(ctx, filter).Decode(&user)
+
+	// Replace the above code with the appropriate logic for your database
+
+	return user, err
 }

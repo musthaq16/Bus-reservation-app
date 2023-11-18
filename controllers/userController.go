@@ -34,11 +34,11 @@ func SignUp() gin.HandlerFunc {
 			return
 		}
 
-		validationErr := validate.Struct(user)
-		if validationErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "2"})
-			return
-		}
+		// validationErr := validate.Struct(user)
+		// if validationErr != nil {
+		// 	c.JSON(http.StatusBadRequest, gin.H{"error": "2"})
+		// 	return
+		// }
 
 		count, err := userCollection.CountDocuments(ctx, bson.M{"email": user.Email})
 		defer cancel()
@@ -84,13 +84,6 @@ func SignUp() gin.HandlerFunc {
 		user.Updated_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		user.ID = primitive.NewObjectID()
 		user.User_id = user.ID.Hex()
-		// token, err := helper.GenerateAllTokens(*user.Email, *user.Username, user.User_id, *user.Role)
-		// user.Token = &token
-		// if err != nil {
-		// 	log.Panic(err)
-		// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while generating token"})
-		// 	return
-		// }
 
 		InsertionNumber, insertErr := userCollection.InsertOne(ctx, user)
 		if insertErr != nil {
@@ -132,9 +125,200 @@ func Login() gin.HandlerFunc {
 		}
 
 		token, _ := helper.GenerateAllTokens(*foundUser.Email, *foundUser.Username, foundUser.User_id, *foundUser.Role)
-		fmt.Println("1111111111111111111111111111111111111111111111111", token)
+		fmt.Println(token)
 		c.JSON(http.StatusOK, gin.H{"token": token, "foundUser": foundUser})
 	}
+}
+
+// HandleForgetPassword is the API endpoint for initiating the forgot password flow
+func ForgetPassword(c *gin.Context) {
+	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+
+	// Extract email from the request body
+	var request models.ForgetPasswordRequest
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		cancel()
+		return
+	}
+
+	// Check if the email exists in the database
+	user, err := helper.GetUserByEmail(ctx, request.Email)
+	defer cancel()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking user existence"})
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User with the provided email not found"})
+		return
+	}
+
+	// Generate an OTP
+	otp := helper.GenerateOTP()
+
+	// Store the OTP and its expiration time in the database
+	err = helper.StoreOTPByEmail(ctx, request.Email, otp)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error storing OTP"})
+		return
+	}
+
+	// TODO: Send an email to the user with the OTP
+	// Send the OTP to the user's email
+	err = helper.SendOTPEmail(request.Email, otp)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send OTP email"})
+		return
+	}
+	// You can use a third-party library or service for sending emails here
+
+	c.JSON(http.StatusOK, gin.H{"message": "OTP sent successfully"})
+}
+
+// HandleResetPasswordWithOTP is the API endpoint for resetting the password using the OTP
+func ResetPasswordWithOTP(c *gin.Context) {
+	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+
+	// Extract email and OTP from the request body
+	var request models.ResetPasswordWithOTPRequest
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		cancel()
+		return
+	}
+
+	// Validate the OTP against the database
+	isValid, err := helper.ValidateOTPByEmail(ctx, request.Email, request.OTP)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error validating OTP"})
+		cancel()
+		return
+	}
+
+	if !isValid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OTP"})
+		cancel()
+		return
+	}
+
+	// // Extract new password from the request body
+	// var resetRequest models.ResetPasswordRequest
+	// if err := c.BindJSON(&resetRequest); err != nil {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+	// 	cancel()
+	// 	return
+	// }
+
+	// Update the user's password in the database
+	err = helper.UpdateUserPassword(ctx, request.Email, helper.HashPassword(request.NewPassword))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		cancel()
+		return
+	}
+
+	// Invalidate the OTP (optional)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
+	cancel()
+}
+
+// HandleForgetPassword is the API endpoint for initiating the forgot password flow
+func HandleForgetPassword(c *gin.Context) {
+	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+
+	// Extract email from the request body
+	var request models.ForgetPasswordRequest
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	// Check if the email exists in the database
+	user, err := helper.GetUserByEmail(ctx, request.Email)
+	defer cancel()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking user existence"})
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User with the provided email not found"})
+		return
+	}
+
+	// Generate a reset token
+	resetToken, err := helper.GenerateResetToken(request.Email)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error wile resetting the token"})
+	}
+
+	// Store the reset token in the database
+	err = helper.StoreResetTokenByEmail(ctx, request.Email, resetToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error storing reset token"})
+		return
+	}
+
+	// TODO: Send an email to the user with a link containing the reset token
+	// Send the password reset link to the user's email
+	err = helper.SendResetLinkEmail(request.Email, resetToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send reset link email"})
+		cancel()
+		return
+	}
+	// You can use a third-party library or service for sending emails here
+
+	c.JSON(http.StatusOK, gin.H{"message": "Reset token generated and email sent successfully"})
+}
+
+// HandleResetPassword is the API endpoint for resetting the user's password
+func HandleResetPassword(c *gin.Context) {
+	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+
+	// Extract reset token from the query parameters
+	resetToken := c.Query("token")
+	if resetToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reset token is required"})
+		cancel()
+		return
+	}
+
+	// Validate the reset token and retrieve the user
+	user, err := helper.GetUserByResetToken(ctx, resetToken)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reset token"})
+		cancel()
+		return
+	}
+	fmt.Println(user)
+
+	// Extract new password from the request body
+	var request models.ResetPasswordRequest
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		cancel()
+		return
+	}
+
+	// Update the user's password in the database
+	err = helper.UpdateUserPassword(ctx, *user.Email, helper.HashPassword(request.NewPassword))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		cancel()
+		return
+	}
+
+	// Mark the reset token as used in the database
+	err = helper.MarkResetTokenAsUsed(ctx, user.User_id)
+	if err != nil {
+		// Handle the error, e.g., log it
+		fmt.Println("eeror while resetting token", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
+	cancel()
 }
 
 // UpdateUserDetailsHandler is the API endpoint to update user details
@@ -155,7 +339,7 @@ func UpdateUserDetailsHandler(c *gin.Context) {
 
 	// Check if the updating username matches the username from the token
 	if updateUserDetailsRequest.User_id != userIdFromToken.(string) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot update details for a different user"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot update details for a different user"})
 		return
 	}
 
@@ -188,7 +372,7 @@ func Adduser(c *gin.Context) {
 	// Check if the user making the request is an admin
 	isAdmin, _ := roleFromToken.(string)
 	if isAdmin != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized access"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unauthorized access"})
 		return
 	}
 
@@ -216,7 +400,7 @@ func Adduser(c *gin.Context) {
 		return
 	}
 	if existingUserMail != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "User with the provided email already exists"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User with the provided email already exists"})
 		return
 	}
 	existingUserName, err := helper.GetUserByUsername(ctx, *addUserRequest.Username)
@@ -234,7 +418,7 @@ func Adduser(c *gin.Context) {
 		return
 	}
 	if existingUserPhone != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "User with the provided Phonenumber already exists"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User with the provided Phonenumber already exists"})
 		return
 	}
 	createdAt, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
@@ -266,6 +450,43 @@ func Adduser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "User added successfully"})
 
+}
+
+// DeleteUserHandler is the API endpoint to delete a user by user_id (admin only)
+func DeleteUserHandler(c *gin.Context) {
+	// Extract admin information from the token or any other identifier
+	roleFromToken, exists := c.Get("role")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Role information not found"})
+		return
+	}
+
+	// Check if the user making the request is an admin
+	isAdmin, _ := roleFromToken.(string)
+	if isAdmin != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unauthorized access"})
+		return
+	}
+
+	// Get the user_id to be deleted from the request
+	user_id := c.Query("user_id")
+	if user_id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id parameter is required"})
+		return
+	}
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Call the DeleteUserByUid function
+	err := helper.DeleteUserByUid(ctx, user_id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to delete user: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 }
 
 func Hello(c *gin.Context) {
