@@ -19,17 +19,12 @@ func main() {
 			"message": "hello from get method",
 		})
 	})
-	r.Use(gin.Logger())
+	// r.Use(gin.Logger())
 
 	routes.UserRouter(r)
 	r.Use(middleware.Authentication())
 	routes.UserRoutes(r)
 	routes.AdminRoutes(r)
-
-	// r.POST("/login", controllers.Login())
-
-	// r.POST("/signup", controller.SignUp())
-	// r.POST("/login", controller.Login())
 
 	r.Run(":5000")
 }

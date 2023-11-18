@@ -60,57 +60,57 @@ func UpdateUserDetailsByUid(ctx context.Context, updateUserDetailsRequest models
 	}
 
 	// Set parameters to existing values if they are missing in the request
-	if updateUserDetailsRequest.Email == nil {
+	if updateUserDetailsRequest.Email == "" {
 		updateUserDetailsRequest.Email = existingUser.Email
 	}
-	if updateUserDetailsRequest.Username == nil {
+	if updateUserDetailsRequest.Username == "" {
 		updateUserDetailsRequest.Username = existingUser.Username
 	}
-	if updateUserDetailsRequest.Phone == nil {
+	if updateUserDetailsRequest.Phone == "" {
 		updateUserDetailsRequest.Phone = existingUser.Phone
 	}
-	if updateUserDetailsRequest.Password == nil {
+	if updateUserDetailsRequest.Password == "" {
 		updateUserDetailsRequest.Password = existingUser.Password
 	}
 
 	// Check if the new username already exists
-	existingUserByUsername, err := GetUserByUsername(ctx, *updateUserDetailsRequest.Username)
+	existingUserByUsername, err := GetUserByUsername(ctx, updateUserDetailsRequest.Username)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
 	if existingUserByUsername != nil && existingUserByUsername.User_id != user_id {
-		return fmt.Errorf("Username %s already exists", *updateUserDetailsRequest.Username)
+		return fmt.Errorf("Username %s already exists", updateUserDetailsRequest.Username)
 	}
 
 	// Check if the new email already exists
-	existingUserByEmail, err := GetUserByEmail(ctx, *updateUserDetailsRequest.Email)
+	existingUserByEmail, err := GetUserByEmail(ctx, updateUserDetailsRequest.Email)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
 	if existingUserByEmail != nil && existingUserByEmail.User_id != user_id {
-		return fmt.Errorf("Email %s already exists", *updateUserDetailsRequest.Email)
+		return fmt.Errorf("Email %s already exists", updateUserDetailsRequest.Email)
 	}
 
 	// Check if the new phone number already exists
-	existingUserByPhone, err := GetUserByPhoneNumber(ctx, *updateUserDetailsRequest.Phone)
+	existingUserByPhone, err := GetUserByPhoneNumber(ctx, updateUserDetailsRequest.Phone)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
 	if existingUserByPhone != nil && existingUserByPhone.User_id != user_id {
-		return fmt.Errorf("Phone number %s already exists", *updateUserDetailsRequest.Phone)
+		return fmt.Errorf("Phone number %s already exists", updateUserDetailsRequest.Phone)
 	}
 
 	// Hash the new password before updating it in the database
-	hashedPassword := HashPassword(*updateUserDetailsRequest.Password)
+	hashedPassword := HashPassword(updateUserDetailsRequest.Password)
 
 	updated_at, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 
 	// Define the update query to set the new hashed password, new email, new username, and new phone number
 	update := bson.M{
 		"$set": bson.M{
-			"username":   *updateUserDetailsRequest.Username,
-			"email":      *updateUserDetailsRequest.Email,
-			"phone":      *updateUserDetailsRequest.Phone,
+			"username":   updateUserDetailsRequest.Username,
+			"email":      updateUserDetailsRequest.Email,
+			"phone":      updateUserDetailsRequest.Phone,
 			"password":   hashedPassword,
 			"updated_at": updated_at,
 		},
@@ -176,13 +176,13 @@ func UpdateUserPasswordByEmail(ctx context.Context, email string, newPassword st
 	// Perform the update operation
 	result, err := userCollection.UpdateOne(ctx, filter, update, options)
 	if err != nil {
-		return fmt.Errorf("Failed to update user password: %v", err)
+		return fmt.Errorf("failed to update user password: %v", err)
 	}
 
 	// Check if any documents were modified
 	if result.ModifiedCount == 0 {
 		// If no documents were modified, it means there is no user with the provided email
-		return fmt.Errorf("No user found with the email: %s", email)
+		return fmt.Errorf("no user found with the email: %s", email)
 	}
 
 	return nil
@@ -191,10 +191,48 @@ func UpdateUserPasswordByEmail(ctx context.Context, email string, newPassword st
 // GetUserByResetToken retrieves a user by their reset token from the database
 func GetUserByResetToken(ctx context.Context, resetToken string) (models.User, error) {
 	var user models.User
-	filter := bson.D{{"reset_token", resetToken}}
+	filter := bson.D{{Key: "reset_token", Value: resetToken}}
 	err := userCollection.FindOne(ctx, filter).Decode(&user)
 
 	// Replace the above code with the appropriate logic for your database
 
 	return user, err
+}
+
+// getAllCustomersFromDatabase retrieves all user details from the database
+func GetAllCustomersFromDatabase(ctx context.Context) ([]models.LimitedUserDetails, error) {
+	// Assuming you have a MongoDB collection named "users" and a model for the User
+	var users []models.LimitedUserDetails
+	// Specify the fields you want to retrieve
+	projection := bson.M{"username": 1, "email": 1, "phone": 1, "created_at": 1}
+	cursor, err := userCollection.Find(ctx, bson.M{"role": "customer"}, options.Find().SetProjection(projection))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	err = cursor.All(ctx, &users)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// getAllUsersFromDatabase retrieves all user details from the database
+func GetAllUsersFromDatabase(ctx context.Context) ([]models.LimitedUserDetails, error) {
+	// Assuming you have a MongoDB collection named "users" and a model for the User
+	var users []models.LimitedUserDetails
+	// Specify the fields you want to retrieve
+	projection := bson.M{"username": 1, "email": 1, "phone": 1, "created_at": 1}
+	cursor, err := userCollection.Find(ctx, bson.M{}, options.Find().SetProjection(projection))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	err = cursor.All(ctx, &users)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
 }

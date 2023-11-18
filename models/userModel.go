@@ -9,20 +9,25 @@ import (
 // User is the model that governs all notes objects retrived or inserted into the DB
 type User struct {
 	ID         primitive.ObjectID `bson:"_id"`
-	Username   *string            `json:"username" validate:"required,min=4"`
-	Password   *string            `json:"password" validate:"required,min=8"`
-	Email      *string            `json:"email" validate:"required,email"`
-	Phone      *string            `json:"phone" validate:"required"`
-	Role       *string            `json:"role" validate:"required"`
+	Username   string            `json:"username" validate:"required,min=4"`
+	Password   string            `json:"password" validate:"required,min=8"`
+	Email      string            `json:"email" validate:"required,email"`
+	Phone      string            `json:"phone" validate:"required"`
+	Role       string            `json:"role" validate:"required"`
 	Created_at time.Time          `json:"created_at"`
 	Updated_at time.Time          `json:"updated_at"`
 	User_id    string             `json:"user_id"`
 	OTP        string             `json:"otp,omitempty"`
 	OTPExpires time.Time          `json:"otpexpires,omitempty"`
 }
+type LimitedUserDetails struct {
+	Username   string    `json:"username" bson:"username"`
+	Email      string    `json:"email" bson:"email"`
+	Phone      string    `json:"phone" bson:"phone"`
+	Created_at time.Time `json:"created_at" bson:"created_at"`
+}
 
 // ResetPasswordRequest represents the request payload for resetting a password
-
 type ResetPasswordRequest struct {
 	Email       string `json:"email" binding:"omitempty,email"`
 	ResetToken  string `json:"resetToken" binding:"omitempty"`

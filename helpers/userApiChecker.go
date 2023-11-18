@@ -54,11 +54,11 @@ func SendResetLinkEmail(email, resetToken string) error {
 }
 
 // UpdateUserPassword updates the user's password in the database
-func UpdateUserPassword(ctx context.Context, userID string, hashedPassword string) error {
+func UpdateUserPassword(ctx context.Context, email string, hashedPassword string) error {
 	// Assuming you have a database connection or ORM
 	// Update the user's password based on the user ID
 
-	filter := bson.M{"email": userID}
+	filter := bson.M{"email": email}
 	update := bson.M{"$set": bson.M{"Password": hashedPassword}}
 	fmt.Println("New Hashed Password:", hashedPassword)
 
@@ -137,4 +137,32 @@ func ValidateOTPByEmail(ctx context.Context, email string, userOTP string) (bool
 	fmt.Println("OTP Expiration:", user.OTPExpires)
 
 	return false, nil
+}
+
+// Invalidate OTP after a successful password reset
+func InvalidateOTP(ctx context.Context, email string) error {
+	// Update user record to clear OTP and expiration time
+	return ClearOTPByEmail(ctx, email)
+}
+
+// ClearOTPByEmail clears the OTP for the user with the given email
+func ClearOTPByEmail(ctx context.Context, email string) error {
+	// Assuming you have a database connection or ORM
+	// Update the user's record to clear OTP and expiration time
+
+	// Define the update operation
+	update := bson.M{
+		"$set": bson.M{
+			"otp":        "",
+			"otpExpires": time.Time{}, // Set to zero time to clear the expiration
+		},
+	}
+
+	// Find the user by email and perform the update
+	_, err := userCollection.UpdateOne(ctx, bson.M{"email": email}, update)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

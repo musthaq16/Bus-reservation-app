@@ -83,6 +83,7 @@ func ValidateToken(signedToken string) (claims *SignedDetails, msg string) {
 	return claims, msg
 }
 
+
 // GenerateResetToken generates a reset token using UUID
 func GenerateResetToken(email string) (string, error) {
 	claims := &jwt.StandardClaims{
@@ -111,7 +112,7 @@ func ValidateResetToken(ctx context.Context, resetToken string) (string, error) 
 		return "", err
 	}
 
-	return *user.Email, nil
+	return user.Email, nil
 }
 
 // StoreResetTokenByEmail stores the reset token in the database
