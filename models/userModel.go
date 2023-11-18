@@ -9,11 +9,11 @@ import (
 // User is the model that governs all notes objects retrived or inserted into the DB
 type User struct {
 	ID         primitive.ObjectID `bson:"_id"`
-	Username   string            `json:"username" validate:"required,min=4"`
-	Password   string            `json:"password" validate:"required,min=8"`
-	Email      string            `json:"email" validate:"required,email"`
-	Phone      string            `json:"phone" validate:"required"`
-	Role       string            `json:"role" validate:"required"`
+	Username   string             `json:"username" validate:min=4"`
+	Password   string             `json:"password" validate:min=8"`
+	Email      string             `json:"email" validate:"required,email"`
+	Phone      string             `json:"phone,omitempty"`
+	Role       string             `json:"role,omitempty"`
 	Created_at time.Time          `json:"created_at"`
 	Updated_at time.Time          `json:"updated_at"`
 	User_id    string             `json:"user_id"`
@@ -28,16 +28,16 @@ type LimitedUserDetails struct {
 }
 
 // ResetPasswordRequest represents the request payload for resetting a password
-type ResetPasswordRequest struct {
-	Email       string `json:"email" binding:"omitempty,email"`
-	ResetToken  string `json:"resetToken" binding:"omitempty"`
-	NewPassword string `json:"newPassword" binding:"required,min=8"`
-}
+// type ResetPasswordRequest struct {
+// 	Email       string `json:"email" binding:"omitempty,email"`
+// 	ResetToken  string `json:"resetToken" binding:"omitempty"`
+// 	NewPassword string `json:"newPassword" binding:"required,min=8"`
+// }
 
 // ForgetPasswordRequest is the structure for forget password API request
-type ForgetPasswordRequest struct {
-	Email string `json:"email" binding:"required,email"`
-}
+// type ForgetPasswordRequest struct {
+// 	Email string `json:"email" binding:"required,email"`
+// }
 
 // ResetPasswordWithOTPRequest represents the request structure for resetting password with OTP
 type ResetPasswordWithOTPRequest struct {

@@ -20,7 +20,7 @@ func UserRouter(incomingRoutes *gin.Engine) {
 // UserRoutes function
 func UserRoutes(incomingRoutes *gin.Engine) {
 	incomingRoutes.PATCH("/edituser", controller.UpdateUserDetailsHandler)
-	incomingRoutes.GET("/me", controller.Me)
+	incomingRoutes.GET("/me", controller.GetMyDetails)
 	incomingRoutes.GET("helloall", controller.Hello)
 }
 

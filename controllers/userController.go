@@ -3,7 +3,6 @@ package controllers
 import (
 	configs "busapp/database"
 	helper "busapp/helpers"
-	"context"
 	"fmt"
 	"log"
 
@@ -77,8 +76,8 @@ func SignUp() gin.HandlerFunc {
 			return
 		}
 
-		user.Created_at= time.Now()
-		user.Updated_at= time.Now()
+		user.Created_at = time.Now()
+		user.Updated_at = time.Now()
 		user.ID = primitive.NewObjectID()
 		user.User_id = user.ID.Hex()
 
@@ -126,19 +125,16 @@ func Login() gin.HandlerFunc {
 
 // HandleForgetPassword is the API endpoint for initiating the forgot password flow
 func ForgetPassword(c *gin.Context) {
-	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 
 	// Extract email from the request body
-	var request models.ForgetPasswordRequest
+	var request models.User
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
-		cancel()
 		return
 	}
 
 	// Check if the email exists in the database
-	user, err := helper.GetUserByEmail(ctx, request.Email)
-	defer cancel()
+	user, err := helper.GetUserByEmail(c, request.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking user existence"})
 		return
@@ -152,7 +148,7 @@ func ForgetPassword(c *gin.Context) {
 	otp := helper.GenerateOTP()
 
 	// Store the OTP and its expiration time in the database
-	err = helper.StoreOTPByEmail(ctx, request.Email, otp)
+	err = helper.StoreOTPByEmail(c, request.Email, otp)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error storing OTP"})
 		return
@@ -171,7 +167,7 @@ func ForgetPassword(c *gin.Context) {
 func ResetPasswordWithOTP(c *gin.Context) {
 
 	// Extract email and OTP from the request body
-	var request models.ResetPasswordWithOTPRequest
+	var request models.User
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
 
@@ -191,7 +187,7 @@ func ResetPasswordWithOTP(c *gin.Context) {
 	}
 
 	// Update the user's password in the database
-	err = helper.UpdateUserPassword(c, request.Email, helper.HashPassword(request.NewPassword))
+	err = helper.UpdateUserPassword(c, request.Email, helper.HashPassword(request.Password))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return
@@ -211,7 +207,7 @@ func ResetPasswordWithOTP(c *gin.Context) {
 func HandleForgetPassword(c *gin.Context) {
 
 	// Extract email from the request body
-	var request models.ForgetPasswordRequest
+	var request models.User
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
 		return
@@ -260,7 +256,7 @@ func HandleResetPassword(c *gin.Context) {
 	resetToken := c.Query("token")
 	if resetToken == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Reset token is required"})
-		
+
 		return
 	}
 
@@ -273,14 +269,14 @@ func HandleResetPassword(c *gin.Context) {
 	fmt.Println(user)
 
 	// Extract new password from the request body
-	var request models.ResetPasswordRequest
+	var request models.User
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
 		return
 	}
 
 	// Update the user's password in the database
-	err = helper.UpdateUserPassword(c, user.Email, helper.HashPassword(request.NewPassword))
+	err = helper.UpdateUserPassword(c, user.Email, helper.HashPassword(request.Password))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return
@@ -289,7 +285,6 @@ func HandleResetPassword(c *gin.Context) {
 	// Mark the reset token as used in the database
 	err = helper.MarkResetTokenAsUsed(c, user.User_id)
 	if err != nil {
-		// Handle the error, e.g., log it
 		fmt.Println("eeror while resetting token", err)
 	}
 	user.Updated_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
@@ -333,7 +328,7 @@ func UpdateUserDetailsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User details updated successfully"})
 }
 
-func Me(c *gin.Context) {
+func GetMyDetails(c *gin.Context) {
 
 	// Get username from the token or any other identifier
 	userIdFromToken, exists := c.Get("uid")
