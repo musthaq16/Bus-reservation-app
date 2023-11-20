@@ -59,7 +59,7 @@ func UpdateUserPassword(ctx context.Context, email string, hashedPassword string
 	// Update the user's password based on the user ID
 
 	filter := bson.M{"email": email}
-	update := bson.M{"$set": bson.M{"Password": hashedPassword}}
+	update := bson.M{"$set": bson.M{"password": hashedPassword}}
 	fmt.Println("New Hashed Password:", hashedPassword)
 
 	result, err := userCollection.UpdateOne(ctx, filter, update)
@@ -154,7 +154,7 @@ func ClearOTPByEmail(ctx context.Context, email string) error {
 	update := bson.M{
 		"$set": bson.M{
 			"otp":        "",
-			"otpExpires": time.Time{}, // Set to zero time to clear the expiration
+			"otpexpires": time.Time{}, // Set to zero time to clear the expiration
 		},
 	}
 

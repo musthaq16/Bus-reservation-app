@@ -7,14 +7,13 @@ import (
 )
 
 // UserRoutes function
-func UserRouter(incomingRoutes *gin.Engine) {
+func Router(incomingRoutes *gin.Engine) {
 	incomingRoutes.POST("/signup", controller.SignUp())
 	incomingRoutes.POST("/login", controller.Login())
-	incomingRoutes.POST("/Forgetpassword", controller.HandleForgetPassword)
-	incomingRoutes.POST("ResetPassword", controller.HandleResetPassword)
-	incomingRoutes.POST("/forgetpassword", controller.ForgetPassword)
-	incomingRoutes.POST("/resetpassword", controller.ResetPasswordWithOTP)
-
+	incomingRoutes.POST("/Forgetpassword", controller.HandleForgetPassword) // by using token
+	incomingRoutes.POST("ResetPassword", controller.HandleResetPassword)    // by using token
+	incomingRoutes.POST("/forgetpassword", controller.ForgetPassword)       //by using otp
+	incomingRoutes.POST("/resetpassword", controller.ResetPasswordWithOTP)  //by using otp
 }
 
 // UserRoutes function
@@ -30,5 +29,6 @@ func AdminRoutes(incomingRoutes *gin.Engine) {
 	incomingRoutes.DELETE("/admin/deleteuser", controller.AdminDeleteUser)
 	incomingRoutes.GET("/admin/getcustomers", controller.AdminGetAllCustomers)
 	incomingRoutes.GET("/admin/getallusers", controller.AdminGetAllUsers)
+	incomingRoutes.POST("/admin/addBus", controller.AddBus)
 	// incomingRoutes.GET("helloall", controller.Hello)
 }

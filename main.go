@@ -21,7 +21,7 @@ func main() {
 	})
 	// r.Use(gin.Logger())
 
-	routes.UserRouter(r)
+	routes.Router(r)
 	r.Use(middleware.Authentication())
 	routes.UserRoutes(r)
 	routes.AdminRoutes(r)

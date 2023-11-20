@@ -12,55 +12,58 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// func AddBus(c *gin.Context) {
-// 	// Extract admin information from the token or any other identifier
-// 	roleFromToken, exists := c.Get("role")
-// 	if !exists {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Role information not found"})
-// 		return
-// 	}
+func AddBus(c *gin.Context) {
+	// Extract admin information from the token or any other identifier
+	roleFromToken, exists := c.Get("role")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Role information not found"})
+		return
+	}
 
-// 	// Check if the user making the request is an admin
-// 	isAdmin, _ := roleFromToken.(string)
-// 	if isAdmin != "admin" {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unauthorized access"})
-// 		return
-// 	}
+	// Check if the user making the request is an admin
+	isAdmin, _ := roleFromToken.(string)
+	if isAdmin != "admin" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unauthorized access"})
+		return
+	}
 
-// 	// Extract user information from the request
-// 	var addBusRequest models.Bus
-// 	if err := c.BindJSON(&addBusRequest); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
-// 		return
-// 	}
+	// Extract bus information from the request
+	var addBusRequest models.Bus
+	if err := c.BindJSON(&addBusRequest); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
 
-// 	// Check if the required fields are present
-// 	if addBusRequest.SeatsTotal < 45 || addBusRequest.Date == "" {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Total seats and date are required"})
-// 		return
-// 	}
+	// Check if the required fields are present
+	if addBusRequest.SeatsTotal < 0 || addBusRequest.SeatsTotal > 45 || addBusRequest.Date == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Total seats and date are required"})
+		return
+	}
 
-// 	createdAt := time.Now()
-// 	updatedAt := time.Now()
+	createdAt := time.Now()
+	updatedAt := time.Now()
 
-// 	// Create a new user object
-// 	newUser := models.Bus{
-// 		ID:     primitive.NewObjectID(),
-// 		Bus_id: primitive.NewObjectID().Hex(),
+	// Create a new user object
+	newBus := models.Bus{
+		ID:         primitive.NewObjectID(),
+		Bus_id:     primitive.NewObjectID().Hex(),
+		Date:       addBusRequest.Date,
+		SeatsTotal: addBusRequest.SeatsTotal,
+		Created_at: createdAt,
+		Updated_at: updatedAt,
+		// Add other fields as needed
+	}
 
-// 		// Add other fields as needed
-// 	}
+	// Insert the new user into the database
+	_, err := busCollection.InsertOne(c, newBus)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to add Bus: %v", err)})
+		return
+	}
 
-// 	// Insert the new user into the database
-// 	_, err = userCollection.InsertOne(ctx, newUser)
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to add user: %v", err)})
-// 		return
-// 	}
+	c.JSON(http.StatusOK, gin.H{"message": "Bus added successfully"})
 
-// 	c.JSON(http.StatusOK, gin.H{"message": "User added successfully"})
-
-// }
+}
 
 func Adduser(c *gin.Context) {
 	// Extract admin information from the token or any other identifier
@@ -126,15 +129,15 @@ func Adduser(c *gin.Context) {
 
 	// Create a new user object
 	newUser := models.User{
-		ID:         primitive.NewObjectID(),
-		Email:      addUserRequest.Email,
-		Password:   hashedPassword,
-		Username:   addUserRequest.Username,
-		User_id:    primitive.NewObjectID().Hex(), // Generate a new UserID
-		Phone:      addUserRequest.Phone,
-		Role:       addUserRequest.Role,
-		Created_at: createdAt,
-		Updated_at: updatedAt,
+		ID:        primitive.NewObjectID(),
+		Email:     addUserRequest.Email,
+		Password:  hashedPassword,
+		Username:  addUserRequest.Username,
+		UserID:    primitive.NewObjectID().Hex(), // Generate a new UserID
+		Phone:     addUserRequest.Phone,
+		Role:      addUserRequest.Role,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
 		// Add other fields as needed
 	}
 

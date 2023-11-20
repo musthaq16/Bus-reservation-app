@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 
 	"busapp/models"
 
@@ -20,7 +19,9 @@ import (
 )
 
 var userCollection *mongo.Collection = configs.GetCollection(configs.DB, "user")
-var validate = validator.New()
+var busCollection *mongo.Collection = configs.GetCollection(configs.DB, "bus")
+
+// var validate = validator.New()
 
 // CreateUser is the api used to tget a single user
 func SignUp() gin.HandlerFunc {
@@ -76,10 +77,10 @@ func SignUp() gin.HandlerFunc {
 			return
 		}
 
-		user.Created_at = time.Now()
-		user.Updated_at = time.Now()
+		user.CreatedAt = time.Now()
+		user.UpdatedAt = time.Now()
 		user.ID = primitive.NewObjectID()
-		user.User_id = user.ID.Hex()
+		user.UserID = user.ID.Hex()
 
 		InsertionNumber, insertErr := userCollection.InsertOne(c, user)
 		if insertErr != nil {
@@ -117,9 +118,9 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
-		token, _ := helper.GenerateAllTokens(foundUser.Email, foundUser.Username, foundUser.User_id, foundUser.Role)
+		token, _ := helper.GenerateAllTokens(foundUser.Email, foundUser.Username, foundUser.UserID, foundUser.Role)
 		fmt.Println(token)
-		c.JSON(http.StatusOK, gin.H{"token": token, "foundUser": foundUser})
+		c.JSON(http.StatusOK, gin.H{"token": token})
 	}
 }
 
@@ -170,7 +171,6 @@ func ResetPasswordWithOTP(c *gin.Context) {
 	var request models.User
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
-
 		return
 	}
 
@@ -283,11 +283,11 @@ func HandleResetPassword(c *gin.Context) {
 	}
 
 	// Mark the reset token as used in the database
-	err = helper.MarkResetTokenAsUsed(c, user.User_id)
+	err = helper.MarkResetTokenAsUsed(c, user.UserID)
 	if err != nil {
 		fmt.Println("eeror while resetting token", err)
 	}
-	user.Updated_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+	user.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
 }
@@ -309,7 +309,7 @@ func UpdateUserDetailsHandler(c *gin.Context) {
 	}
 
 	// Check if the updating username matches the username from the token
-	if updateUserDetailsRequest.User_id != userIdFromToken.(string) {
+	if updateUserDetailsRequest.UserID != userIdFromToken.(string) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot update details for a different user"})
 		return
 	}
@@ -318,7 +318,7 @@ func UpdateUserDetailsHandler(c *gin.Context) {
 	err := helper.UpdateUserDetailsByUid(
 		c,
 		updateUserDetailsRequest,
-		updateUserDetailsRequest.User_id,
+		updateUserDetailsRequest.UserID,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update user details: %v", err)})
@@ -350,7 +350,7 @@ func GetMyDetails(c *gin.Context) {
 		"email":      user.Email,
 		"phone":      user.Phone,
 		"role":       user.Role,
-		"updated_at": user.Updated_at,
+		"updated_at": user.UpdatedAt,
 	})
 }
 

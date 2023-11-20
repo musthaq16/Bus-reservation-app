@@ -78,7 +78,7 @@ func UpdateUserDetailsByUid(ctx context.Context, updateUserDetailsRequest models
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
-	if existingUserByUsername != nil && existingUserByUsername.User_id != user_id {
+	if existingUserByUsername != nil && existingUserByUsername.UserID != user_id {
 		return fmt.Errorf("Username %s already exists", updateUserDetailsRequest.Username)
 	}
 
@@ -87,7 +87,7 @@ func UpdateUserDetailsByUid(ctx context.Context, updateUserDetailsRequest models
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
-	if existingUserByEmail != nil && existingUserByEmail.User_id != user_id {
+	if existingUserByEmail != nil && existingUserByEmail.UserID != user_id {
 		return fmt.Errorf("Email %s already exists", updateUserDetailsRequest.Email)
 	}
 
@@ -96,7 +96,7 @@ func UpdateUserDetailsByUid(ctx context.Context, updateUserDetailsRequest models
 	if err != nil && err != mongo.ErrNoDocuments {
 		return err
 	}
-	if existingUserByPhone != nil && existingUserByPhone.User_id != user_id {
+	if existingUserByPhone != nil && existingUserByPhone.UserID != user_id {
 		return fmt.Errorf("Phone number %s already exists", updateUserDetailsRequest.Phone)
 	}
 

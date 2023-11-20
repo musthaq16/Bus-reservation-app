@@ -26,6 +26,7 @@ type SignedDetails struct {
 
 var userCollection *mongo.Collection = configs.GetCollection(configs.DB, "user")
 
+
 var SECRET_KEY string = os.Getenv("SECRET_KEY")
 
 // GenerateAllTokens generates both teh detailed token and refresh token
@@ -82,7 +83,6 @@ func ValidateToken(signedToken string) (claims *SignedDetails, msg string) {
 
 	return claims, msg
 }
-
 
 // GenerateResetToken generates a reset token using UUID
 func GenerateResetToken(email string) (string, error) {
